@@ -8,11 +8,39 @@ object Plus : Token()
 object Times : Token()
 object LP : Token()
 object RP : Token()
+object END : Token()
 
-class Parser(val input : String) {
+class Parser(i : String) {
     private var pos : Int = 0
-    fun getToken() : Token = TODO()
-    fun ungetToken() : Unit = TODO()
+    private var lpos : Int = pos
+    private var input : String = i + "\uffff"
+
+    companion object {
+        const val numbers = "1234567890"
+    }
+
+    fun getToken() : Token {
+        lpos = pos
+        return when (input[pos]) {
+            in numbers -> readNum()
+            '+' -> { pos++; Plus }
+            '*' -> { pos++; Times }
+            '(' -> { pos++; LP }
+            ')' -> { pos++; RP }
+            '\uffff' ->  { pos++; END }
+            else -> TODO()
+        }
+    }
+
+    private fun readNum(): Number {
+        while (input[pos] in numbers) pos++
+        return Number(BigInteger(input.slice(IntRange(lpos, pos - 1))))
+    }
+
+    fun ungetToken() {
+        pos = lpos
+    }
+
     fun parse() : Expression {
         val x = getToken()
         return when (x) {
@@ -21,9 +49,10 @@ class Parser(val input : String) {
             Times -> TODO()
             LP -> {
                 ungetToken()
-                parseEnclosed()
+                parseTermEx(parseEnclosed())
             }
             RP -> TODO()
+            END -> Numeral(BigInteger.valueOf(0))
         }
     }
 
@@ -46,9 +75,10 @@ class Parser(val input : String) {
             LP -> {
                 val x = parse()
                 parseRP()
-                x
+                Enclosed(x)
             }
             RP -> TODO()
+            END -> TODO()
         }
     }
 
@@ -69,6 +99,7 @@ class Parser(val input : String) {
                 ungetToken()
                 left
             }
+            END -> left
         }
     }
 
@@ -79,23 +110,21 @@ class Parser(val input : String) {
         is Enclosed -> expr
     }
 
-    tailrec fun parseExprEx(left : Expression) : Expression {
+    fun parseExprEx(left : Expression) : Expression {
         val x = getToken()
         return when (x) {
             is Number -> TODO()
             Plus -> {
                 val n = parseEnclosed()
-                parseExprEx(Addition(left, n))
+                Addition(left, parseTermEx(n))
             }
-            Times -> {
-                ungetToken()
-                parseTermEx(rightMost(left))
-            }
+            Times -> TODO()
             LP -> TODO()
             RP -> {
                 ungetToken()
                 left
             }
+            END -> left
         }
     }
 }
