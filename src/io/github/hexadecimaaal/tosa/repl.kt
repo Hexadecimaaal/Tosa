@@ -8,14 +8,14 @@ class REPL(
     inputStream : InputStream,
     outputStream : OutputStream,
     private val hint : String,
-    sync : Boolean
+    sync : Boolean = true
 ) {
   private val reader = inputStream.reader()
   private val writer = PrintWriter(outputStream, sync)
   fun run() {
     writer.printf(hint)
     reader.forEachLine {
-      writer.println("${simpl(parse(it))}\n")
+      writer.println("${simpl(normalize(parse(it)))}\n")
       writer.printf(hint)
     }
   }
@@ -27,7 +27,7 @@ class REPL(
 }
 
 fun main(args : Array<String>) {
-  val r = REPL(System.`in`, System.out, ">>>", true)
+  val r = REPL(System.`in`, System.out, ">>>")
   r.run()
   r.close()
 }

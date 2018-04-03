@@ -16,9 +16,8 @@ class ParserTests {
   @Test
   fun enclosed() {
     assertEquals(
-        Enclosed(
             Addition(Numeral(BigInteger.valueOf(1)),
-                Numeral(BigInteger.valueOf(1)))),
+                Numeral(BigInteger.valueOf(1))),
         parse("(1+1)"))
   }
 
@@ -38,10 +37,10 @@ class ParserTests {
   fun hybrid2() {
     assertEquals(
         Multiplication(
-            Enclosed(Addition(
+            Addition(
                 Numeral(BigInteger.valueOf(1)),
                 Numeral(BigInteger.valueOf(2))
-            )),
+            ),
             Numeral(BigInteger.valueOf(3))),
         parse("(1+2)*3"))
   }
