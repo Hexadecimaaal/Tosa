@@ -4,11 +4,27 @@ import java.math.*
 
 sealed class Expression {
   abstract fun reduce() : Expression
+  open operator fun plus(e : Expression) : Addition = Addition(this, e)
+  open operator fun times(e : Expression) : Multiplication = Multiplication(this, e)
 }
 
 data class Numeral(val value : BigInteger) : Expression() {
   override fun reduce() = this
   override fun toString() = value.toString()
+
+  companion object {
+    val ONE = Numeral(BigInteger.ONE)
+    val ZERO = Numeral(BigInteger.ZERO)
+  }
+
+  operator fun plus(e : Numeral) : Numeral =
+      Numeral(value + e.value)
+  operator fun times(e : Numeral) : Numeral =
+      Numeral(value * e.value)
+  fun power(e : Numeral) : Numeral =
+      Numeral(value.pow(e.value.toInt()))
+
+  fun toSum() : Sum = Sum(mapOf(), this)
 }
 
 data class Addition(val lhs : Expression, val rhs : Expression) : Expression() {
@@ -23,7 +39,7 @@ data class Power(val base : Expression, val exponent : Expression) : Expression(
   override fun toString() = "$base ^ $exponent"
   override fun reduce() =
       if (base is Numeral && exponent is Numeral) Numeral(base.value.pow(exponent.value.toInt()))
-      else if (exponent == BigInteger.valueOf(1)) base
+      else if (exponent == BigInteger.ONE) base
       else Power(base.reduce(), exponent.reduce())
 }
 
@@ -40,60 +56,145 @@ data class Symbol(val name : String) : Expression() {
 }
 
 data class Product(
-    val table : Map<Expression, BigInteger>,
-    val constant : BigInteger = BigInteger.valueOf(1)
+    val table : Map<Expression, Sum>,
+    val constant : Numeral = Numeral.ONE
 ) : Expression() {
+  override fun reduce() : Expression = this
 
   override fun toString() : String {
-    var res = if (constant != BigInteger.valueOf(1)) constant.toString() else ""
+    var res = constant.toString()
     for ((base, exponent) in table) {
       res += "* $base"
-      if (exponent != BigInteger.valueOf(1)) res += "^ $exponent"
+      if (!(exponent.table.isEmpty() && exponent.constant == Numeral.ONE))
+        res += "^ $exponent"
     }
     return res
   }
 
-  override fun reduce() : Product {
-    val map = mutableMapOf<Expression, BigInteger>()
-    var const = this.constant
-    for (factor in list.map(::simpl)) {
-      if (factor is Numeral) const *= factor.value
-      else if (factor is Power && factor.exponent is Numeral)
-        map[factor] = map.getOrElse(factor, { BigInteger.valueOf(0) }) + factor.exponent.value
-      else
-        map[factor] = map.getOrElse(factor, { BigInteger.valueOf(0) }) + BigInteger.valueOf(1)
+  fun combine(pp : Product, mult : Sum = Numeral.ONE.toSum()) : Product {
+    val p = pp.distrib(mult)
+    val result = table.toMutableMap()
+    for ((base, exp) in p.table) {
+      result[base] = result[base]?.combine(exp) ?: exp
     }
-    val res = mutableListOf<Expression>()
-    for ((base, exponent) in map) {
-      res.add(Power(base, Numeral(exponent)))
+    return Product(result, constant + p.constant)
+  }
+
+  fun combine(e : Expression, exp : Sum = Numeral.ONE.toSum()) : Product {
+    if (e is Numeral) return Product(table, constant * e)
+    val result = table.toMutableMap()
+    result[e] = result[e]?.combine(exp) ?: exp
+    return Product(result, constant)
+  }
+
+  fun distrib(exp : Expression) : Product =
+      Product(table.mapValues {
+        it.value.distrib(exp)
+      }, constant)
+
+  fun distrib(exp : Numeral) : Product = Product(table.mapValues {
+    it.value.distrib(exp)
+  }, constant)
+
+  fun distrib(exp : Sum) : Product {
+    val result = Product(mutableMapOf(), constant.power(exp.constant))
+    for((base, multplicator) in exp.table)
+      result.combine(distrib(base).distrib(multplicator))
+    for((base, multplicator) in exp.table)
+      result.combine(Power(base, base * multplicator))
+    return result
+  }
+
+  fun flatten() : Product {
+    val result = Product(mapOf(), constant)
+    for ((base, exp) in table) when (base) {
+      is Sum -> result.combine(base.flatten(), exp)
+      is Product -> result.combine(base.flatten(), exp)
+      else -> result.combine(base, exp)
     }
-    return Product(res, const)
+    return result
   }
 }
 
-fun concatProducts(l : List<Product>) : Product {
-  var const = BigInteger.valueOf(1)
-  val result = mutableListOf<Expression>()
-  for (product in l) {
-    const *= product.constant
-    result.addAll(product.list)
+data class Sum(
+    val table : Map<Expression, Numeral>,
+    val constant : Numeral = Numeral.ZERO
+) : Expression() {
+  override fun reduce() : Expression = this
+
+  override fun toString() : String {
+    var res = ""
+    for ((base, mult) in table) {
+      if (mult != Numeral.ONE) res += "$mult * "
+      res += "$base +"
+    }
+    res += constant.toString()
+    return res
   }
-  return Product(result, const)
+
+  fun combine(s : Sum, mult : Numeral = Numeral.ONE) : Sum {
+    val p = s.distrib(mult)
+    val result = table.toMutableMap()
+    for ((base, t) in p.table)
+      result[base] = result[base]?.plus(t) ?: t
+    return Sum(result, constant.plus(p.constant))
+  }
+
+  fun combine(e : Expression, mult : Numeral = Numeral.ONE) : Sum {
+    if (e is Numeral) return Sum(table, constant + e)
+    val result = table.toMutableMap()
+    result[e] = result[e]?.plus(mult) ?: mult
+    return Sum(result, constant)
+  }
+  
+  fun distrib(mult : Expression) : Sum =
+      Sum(table.mapKeys {
+        it.key * mult
+      })
+
+  fun distrib(mult : Numeral) : Sum =
+      Sum(table.mapValues {
+        it.value * mult
+      })
+  
+  fun distrib(mult : Sum) : Sum {
+    val result = Sum(mutableMapOf(), mult.constant * constant)
+    for((base, multplicator) in mult.table)
+      result.combine(distrib(base).distrib(multplicator))
+    for((base, multplicator) in mult.table)
+      result.combine(base * multplicator * constant)
+    return result
+  }
+
+  fun flatten() : Sum {
+    val result = Sum(mapOf(), constant)
+    for ((base, mult) in table) when (base) {
+      is Sum -> result.combine(base.flatten(), mult)
+      is Product -> result.combine(base.flatten(), mult)
+      else -> result.combine(base, mult)
+    }
+    return result
+  }
 }
 
-fun productfromExpr(e : Expression) : Product {
-  return when (e) {
-    is Numeral -> Product(listOf(), e.value).reduce()
-    is Addition, is Symbol, is Power -> Product(listOf(e)).reduce()
-    is Multiplication -> Product(listOf(e.lhs, e.rhs)).reduce()
-    is Product -> concatProducts(e.map(::productfromExpr)).let {
-      Product(it.list, it.constant * e.constant)
-    }
-  }
+fun elim(e : Expression) : Expression = when (e) {
+  is Numeral -> e
+  is Addition -> Sum(mapOf(
+      elim(e.lhs) to Numeral.ONE,
+      elim(e.rhs) to Numeral.ONE))
+  is Power -> Power(elim(e.base), elim(e.exponent))
+  is Multiplication -> Product(mapOf(
+      elim(e.lhs) to Numeral.ONE.toSum(),
+      elim(e.rhs) to Numeral.ONE.toSum()))
+  is Symbol -> e
+  is Product -> Product(
+      e.table.mapKeys { elim(it.key) },
+      e.constant)
+  is Sum -> Sum(
+      e.table.mapKeys { elim(it.key) },
+      e.constant)
 }
 
 tailrec fun simpl(e : Expression) : Expression =
     if (e == e.reduce()) e else simpl(e.reduce())
 
-tailrec fun normalize(e : Expression) : Expression =
-    if (e == productfromExpr(e)) e else normalize(productfromExpr(e))

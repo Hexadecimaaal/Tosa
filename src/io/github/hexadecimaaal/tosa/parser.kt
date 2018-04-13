@@ -109,6 +109,8 @@ class Parser(i : String) {
       LP -> TODO()
       RP -> return
       END -> TODO()
+      Caret -> TODO()
+      is Identifier -> TODO()
     }
   }
 

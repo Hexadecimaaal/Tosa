@@ -15,7 +15,7 @@ class REPL(
   fun run() {
     writer.printf(hint)
     reader.forEachLine {
-      writer.println("${simpl(normalize(parse(it)))}\n")
+      writer.println("${simpl((parse(it)))}\n")
       writer.printf(hint)
     }
   }
