@@ -15,12 +15,15 @@ data class Numeral(val value : BigInteger) : Expression() {
   companion object {
     val ONE = Numeral(BigInteger.ONE)
     val ZERO = Numeral(BigInteger.ZERO)
+    val MINUS_ONE = Numeral(BigInteger.valueOf(-1))
   }
 
   operator fun plus(e : Numeral) : Numeral =
       Numeral(value + e.value)
+
   operator fun times(e : Numeral) : Numeral =
       Numeral(value * e.value)
+
   fun power(e : Numeral) : Numeral =
       Numeral(value.pow(e.value.toInt()))
 
@@ -98,9 +101,9 @@ data class Product(
 
   fun distrib(exp : Sum) : Product {
     val result = Product(mutableMapOf(), constant.power(exp.constant))
-    for((base, multplicator) in exp.table)
+    for ((base, multplicator) in exp.table)
       result.combine(distrib(base).distrib(multplicator))
-    for((base, multplicator) in exp.table)
+    for ((base, multplicator) in exp.table)
       result.combine(Power(base, base * multplicator))
     return result
   }
@@ -146,7 +149,7 @@ data class Sum(
     result[e] = result[e]?.plus(mult) ?: mult
     return Sum(result, constant)
   }
-  
+
   fun distrib(mult : Expression) : Sum =
       Sum(table.mapKeys {
         it.key * mult
@@ -156,12 +159,12 @@ data class Sum(
       Sum(table.mapValues {
         it.value * mult
       })
-  
+
   fun distrib(mult : Sum) : Sum {
     val result = Sum(mutableMapOf(), mult.constant * constant)
-    for((base, multplicator) in mult.table)
+    for ((base, multplicator) in mult.table)
       result.combine(distrib(base).distrib(multplicator))
-    for((base, multplicator) in mult.table)
+    for ((base, multplicator) in mult.table)
       result.combine(base * multplicator * constant)
     return result
   }

@@ -15,7 +15,13 @@ class REPL(
   fun run() {
     writer.printf(hint)
     reader.forEachLine {
-      writer.println("${simpl((parse(it)))}\n")
+      try {
+        writer.println("${simpl((parse(it)))}\n")
+
+      }
+      catch (e : ParseException) {
+        writer.println(e.message)
+      }
       writer.printf(hint)
     }
   }

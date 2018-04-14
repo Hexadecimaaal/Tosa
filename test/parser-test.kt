@@ -16,8 +16,8 @@ class ParserTests {
   @Test
   fun enclosed() {
     assertEquals(
-            Addition(Numeral(BigInteger.valueOf(1)),
-                Numeral(BigInteger.valueOf(1))),
+        Addition(Numeral(BigInteger.valueOf(1)),
+            Numeral(BigInteger.valueOf(1))),
         parse("(1+1)"))
   }
 
