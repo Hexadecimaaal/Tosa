@@ -74,9 +74,17 @@ class Parser(i : String) {
         pos++
         Plus
       }
+      '-' -> {
+        pos++
+        Minus
+      }
       '*' -> {
         pos++
         Times
+      }
+      '/' -> {
+        pos++
+        Slash
       }
       '^' -> {
         pos++
@@ -116,10 +124,8 @@ class Parser(i : String) {
     val x = getToken()
     ungetToken()
     return when (x) {
-      is Number -> parseFactor()
-      LP -> parseFactor()
+      is Number, LP, is Identifier -> parseTermEx(parseFactor())
       END -> Numeral(BigInteger.valueOf(0))
-      is Identifier -> parseFactor()
       else -> throw ParseException("unexpected token \"$x\"")
     }
   }
@@ -150,24 +156,12 @@ class Parser(i : String) {
     val left = parseEnclosed()
     val x = getToken()
     return when (x) {
-      Plus, Minus -> {
-        ungetToken()
-        parseExprEx(left)
-      }
-      Times, Slash -> {
-        ungetToken()
-        parseTermEx(left)
-      }
       Caret -> {
         Power(left, parseFactor())
       }
-      END -> {
+      END, is Identifier, Plus, Minus, Times, Slash, LP, RP-> {
         ungetToken()
         left
-      }
-      is Identifier -> {
-        ungetToken()
-        parseTermEx(left)
       }
       else -> throw ParseException("unexpected token \"$x\"")
     }
@@ -192,7 +186,10 @@ class Parser(i : String) {
         ungetToken()
         left
       }
-      END -> left
+      END -> {
+        ungetToken()
+        left
+      }
       is Identifier -> {
         parseTermEx(Multiplication(left, x.toSymbol()))
       }
@@ -222,7 +219,10 @@ class Parser(i : String) {
         ungetToken()
         left
       }
-      END -> left
+      END -> {
+        ungetToken()
+        left
+      }
       else -> throw ParseException("unexpected token \"$x\"")
     }
   }
