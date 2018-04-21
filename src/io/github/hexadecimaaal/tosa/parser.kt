@@ -6,11 +6,11 @@ sealed class Token
 
 data class Number(private val value : BigInteger) : Token() {
   fun toNumeral() = Numeral(value)
-  override fun toString() : String = "integer '$value'"
+  override fun toString() : String = "integer $value"
 }
 
 object Plus : Token() {
-  override fun toString() : String = "plus '+'"
+  override fun toString() : String = "plus +"
 }
 
 object Minus : Token() {
@@ -174,7 +174,7 @@ class Parser(i : String) {
         ungetToken()
         parseExprEx(left)
       }
-      Times -> {
+      Times, LP -> {
         val n = parseFactor()
         parseTermEx(Multiplication(left, n))
       }

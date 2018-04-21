@@ -4,6 +4,7 @@ import java.math.*
 
 sealed class Expression {
   abstract fun reduce() : Expression
+  open fun clear() : Expression = this.reduce()
   open operator fun plus(e : Expression) : Addition = Addition(this, e)
   open operator fun times(e : Expression) : Multiplication = Multiplication(this, e)
 }
@@ -39,7 +40,16 @@ data class Addition(val lhs : Expression, val rhs : Expression) : Expression() {
 }
 
 data class Power(val base : Expression, val exponent : Expression) : Expression() {
-  override fun toString() = "$base ^ $exponent"
+  override fun toString() = when (base.clear()) {
+    is Numeral, is Symbol -> base.toString()
+    is Addition, is Multiplication,
+    is Product, is Sum, is Power -> "($base)"
+  } + when (exponent.clear()) {
+    Numeral.ONE -> ""
+    is Numeral, is Symbol, is Power -> " ^ $exponent"
+    is Addition, is Multiplication, is Product, is Sum -> " ^ ($exponent)"
+  }
+
   override fun reduce() : Expression =
       if (base is Numeral && exponent is Numeral) Numeral(base.value.pow(exponent.value.toInt()))
       else if (exponent == BigInteger.ONE) base
@@ -47,7 +57,19 @@ data class Power(val base : Expression, val exponent : Expression) : Expression(
 }
 
 data class Multiplication(val lhs : Expression, val rhs : Expression) : Expression() {
-  override fun toString() = "$lhs * $rhs"
+  override fun toString() = when (lhs.clear()) {
+    Numeral.ONE -> ""
+    is Numeral, is Symbol,
+    is Multiplication, is Power,
+    is Product -> "$lhs * "
+    is Addition, is Sum -> "($lhs) * "
+  } + when (rhs.clear()) {
+    is Numeral, is Symbol,
+    is Power -> rhs.toString()
+    is Multiplication, is Addition, is Sum,
+    is Product -> "($rhs)"
+  }
+
   override fun reduce() : Expression =
       if (lhs is Numeral && rhs is Numeral) Numeral(lhs.value * rhs.value)
       else Multiplication(lhs.reduce(), rhs.reduce())
@@ -67,6 +89,15 @@ data class Product(
     fun nil() : Product = Product(mapOf())
   }
 
+  override fun clear() : Expression =
+      if (table.isEmpty()) constant
+      else if (
+          constant == Numeral.ONE &&
+          table.size == 1 &&
+          table[table.keys.first()] == Numeral.ONE.toSum())
+        table.keys.first()
+      else this
+
   override fun reduce() : Product {
     var res = Product(mapOf(), constant)
     for ((base, exp) in table) {
@@ -78,9 +109,7 @@ data class Product(
   override fun toString() : String {
     var res = constant.toString()
     for ((base, exponent) in table) {
-      res += " * $base"
-      if (!(exponent.table.isEmpty() && exponent.constant == Numeral.ONE))
-        res += " ^ $exponent"
+      res += " * ${Power(base.clear(), exponent.clear())}"
     }
     if (res.startsWith("1 * ")) res = res.drop(4)
     return res
@@ -160,6 +189,15 @@ data class Sum(
     fun nil() : Sum = Sum(mapOf())
   }
 
+  override fun clear() : Expression =
+      if (table.isEmpty()) constant
+      else if (
+          constant == Numeral.ONE &&
+          table.size == 1 &&
+          table[table.keys.first()] == Numeral.ONE)
+        table.keys.first()
+      else this
+
   override fun reduce() : Sum {
     var res = nil()
     for ((base, mult) in table) {
@@ -170,10 +208,8 @@ data class Sum(
 
   override fun toString() : String {
     var res = ""
-    for ((base, mult) in table) {
-      if (mult != Numeral.ONE) res += "$mult * "
-      res += "$base + "
-    }
+    for ((base, mult) in table)
+      res += "${Multiplication(mult, base)} + "
     res += constant.toString()
     if (res.endsWith(" + 0")) res = res.dropLast(4)
     return res
