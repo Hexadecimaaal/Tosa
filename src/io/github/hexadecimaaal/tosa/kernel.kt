@@ -5,6 +5,7 @@ import java.math.*
 sealed class Expression {
   abstract fun reduce() : Expression
   open fun clear() : Expression = this.reduce()
+  fun simplify() : Expression = this.reduce().clear()
   open operator fun plus(e : Expression) : Addition = Addition(this, e)
   open operator fun times(e : Expression) : Multiplication = Multiplication(this, e)
 }
@@ -34,7 +35,7 @@ data class Numeral(val value : BigInteger) : Expression() {
 data class Addition(val lhs : Expression, val rhs : Expression) : Expression() {
   override fun reduce() : Expression =
       if (lhs is Numeral && rhs is Numeral) Numeral(lhs.value + rhs.value)
-      else Addition(lhs.reduce(), rhs.reduce())
+      else Addition(lhs.simplify(), rhs.simplify())
 
   override fun toString() = "$lhs + $rhs"
 }
@@ -52,8 +53,12 @@ data class Power(val base : Expression, val exponent : Expression) : Expression(
 
   override fun reduce() : Expression =
       if (base is Numeral && exponent is Numeral) Numeral(base.value.pow(exponent.value.toInt()))
-      else if (exponent == BigInteger.ONE) base
-      else Power(base.reduce(), exponent.reduce())
+      else if (exponent == Numeral.ONE) base
+//      else if (
+//          exponent == Numeral.ZERO &&
+//          base != Numeral.ZERO
+//      ) Numeral.ONE
+      else Power(base.simplify(), exponent.simplify())
 }
 
 data class Multiplication(val lhs : Expression, val rhs : Expression) : Expression() {
@@ -72,7 +77,7 @@ data class Multiplication(val lhs : Expression, val rhs : Expression) : Expressi
 
   override fun reduce() : Expression =
       if (lhs is Numeral && rhs is Numeral) Numeral(lhs.value * rhs.value)
-      else Multiplication(lhs.reduce(), rhs.reduce())
+      else Multiplication(lhs.simplify(), rhs.simplify())
 }
 
 data class Symbol(private val name : String) : Expression() {
@@ -93,12 +98,14 @@ data class Product(
       if (table.isEmpty()) constant
       else if (
           constant == Numeral.ONE &&
-          table.size == 1 &&
-          table[table.keys.first()] == Numeral.ONE.toSum())
-        table.keys.first()
+          table.size == 1
+      )
+        Power(table.keys.first(), table.values.first())
       else this
 
-  override fun reduce() : Product {
+  override fun reduce() : Expression {
+    if (constant == Numeral.ZERO)
+      return constant
     var res = Product(mapOf(), constant)
     for ((base, exp) in table) {
       res = res.combine(base.reduce(), exp.reduce())
@@ -143,33 +150,29 @@ data class Product(
   fun distrib(exp : Sum) : Product {
     var result = Product(mutableMapOf(), constant.power(exp.constant))
 
-    for ((basee, mult) in exp.table) {
+    for ((baseExp, mult) in exp.table) {
       for ((base, expo) in table) {
-        result = result.combine(base, expo.distrib(basee).distrib(mult))
+        result = result.combine(base, expo.distrib(baseExp).distrib(mult))
       }
-      result = result.combine(constant, Sum.nil().combine(mult).combine(basee))
+      result = result.combine(constant, Sum.nil().combine(mult).combine(baseExp))
     }
     for ((base, expo) in table) {
       result = result.combine(base, expo.distrib(exp.constant))
     }
-//    for ((base, multplicator) in exp.table)
-//      result = result.combine(distrib(base).distrib(multplicator))
-//    for ((base, multplicator) in exp.table)
-//      result = result.combine(Power(base, base * multplicator))
     return result
   }
 
   fun flatten() : Product {
     var result = Product(mapOf(), constant)
     for ((base, exp) in table) result = when (base) {
-      is Sum -> result.combine(base.flatten(), exp)
       is Product -> result.combine(base.flatten(), exp)
+      is Power -> result.combine(base.base, exp.distrib(base.exponent))
       else -> result.combine(base, exp)
     }
     return result
   }
 
-  fun lift() : Product {
+  private fun lift() : Product {
     var result = Product(mapOf(), constant)
     for ((base, exp) in table) {
       result =
@@ -192,16 +195,17 @@ data class Sum(
   override fun clear() : Expression =
       if (table.isEmpty()) constant
       else if (
-          constant == Numeral.ONE &&
-          table.size == 1 &&
-          table[table.keys.first()] == Numeral.ONE)
-        table.keys.first()
+          constant == Numeral.ZERO &&
+          table.size == 1)
+        Multiplication(table.keys.first(), table.values.first())
       else this
 
   override fun reduce() : Sum {
     var res = nil()
     for ((base, mult) in table) {
-      res = res.combine(base.reduce(), mult.reduce())
+      val x = base.simplify()
+      res = if (x is Numeral) res.combine(x.toSum(), mult.reduce())
+      else res.combine(x, mult.reduce())
     }
     return elim(res).flatten().lift()
   }
@@ -242,8 +246,8 @@ data class Sum(
 
   fun distrib(mult : Sum) : Sum {
     var result = Sum(mutableMapOf(), mult.constant * constant)
-    for ((base, multplicator) in mult.table)
-      result = result.combine(distrib(base).distrib(multplicator))
+    for ((base, multiplicator) in mult.table)
+      result = result.combine(distrib(base).distrib(multiplicator))
     for ((base, multplicator) in mult.table)
       result = result.combine(base * multplicator * constant)
     return result
@@ -261,7 +265,7 @@ data class Sum(
 
   private fun nil() = Sum(mapOf(), constant)
 
-  fun lift() : Sum {
+  private fun lift() : Sum {
     var result = nil()
     for ((base, mult) in table) result =
         if (base is Product) result.combine(Product(base.table), mult * base.constant)
@@ -301,9 +305,9 @@ fun elim(e : Expression) : Expression = when (e) {
 }
 
 tailrec fun simpl(expr : Expression) : Expression {
-  val e = elim(expr)
-  return if (e == e.reduce()) e
-  else simpl(e.reduce())
+  val e = elim(expr).simplify()
+  return if (e == expr) e
+  else simpl(e)
 }
 
 

@@ -159,7 +159,7 @@ class Parser(i : String) {
       Caret -> {
         Power(left, parseFactor())
       }
-      END, is Identifier, Plus, Minus, Times, Slash, LP, RP-> {
+      END, is Identifier, Plus, Minus, Times, Slash, LP, RP -> {
         ungetToken()
         left
       }
@@ -180,7 +180,7 @@ class Parser(i : String) {
       }
       Slash -> {
         val n = parseFactor()
-        parseTermEx(Multiplication(left, Multiplication(n, Numeral.MINUS_ONE)))
+        parseTermEx(Multiplication(left, Power(n, Numeral.MINUS_ONE)))
       }
       RP -> {
         ungetToken()
@@ -197,23 +197,19 @@ class Parser(i : String) {
     }
   }
 
-//    tailrec fun rightMost(expr : Expression) : Expression = when (expr) {
-//        is Numeral -> expr
-//        is Addition -> rightMost(expr.rhs)
-//        is Multiplication -> rightMost(expr.rhs)
-//        is Enclosed -> expr
-//    }
 
   private fun parseExprEx(left : Expression) : Expression {
     val x = getToken()
     return when (x) {
       Plus -> {
         val n = parseFactor()
-        Addition(left, parseTermEx(n))
+        parseTermEx(Addition(left, n))
       }
       Minus -> {
         val n = parseFactor()
-        Addition(left, Multiplication(parseTermEx(n), Numeral.MINUS_ONE))
+        parseTermEx(
+            Addition(left, Multiplication(n, Numeral.MINUS_ONE))
+        )
       }
       RP -> {
         ungetToken()
