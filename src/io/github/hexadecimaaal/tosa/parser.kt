@@ -41,6 +41,16 @@ object END : Token() {
   override fun toString() : String = "end of input"
 }
 
+object BackSlash : Token() {
+  override fun toString() : String = "backslash '\\'"
+}
+
+object Dot : Token() {
+  override fun toString() : String {
+    return "dot '.'"
+  }
+}
+
 data class Identifier(private val name : String) : Token() {
   fun toSymbol() = Symbol(name)
 }
@@ -48,7 +58,7 @@ data class Identifier(private val name : String) : Token() {
 class Parser(i : String) {
   private var pos : Int = 0
   private var lpos : Int = pos
-  private var input : String = i + "\uffff"
+  private var input : String = i + "\u0000"
 
   companion object {
     const val numbers = "1234567890"
@@ -57,7 +67,7 @@ class Parser(i : String) {
     const val Space = " \n\t\r"
   }
 
-  private fun eatIdentifier() : Identifier {
+  private fun getIdentifier() : Identifier {
     var s = ""
     while (input[pos] in AZaz09) {
       s += input[pos]
@@ -86,6 +96,14 @@ class Parser(i : String) {
         pos++
         Slash
       }
+      '\\' -> {
+        pos++
+        BackSlash
+      }
+      '.' -> {
+        pos++
+        Dot
+      }
       '^' -> {
         pos++
         Caret
@@ -98,11 +116,11 @@ class Parser(i : String) {
         pos++
         RP
       }
-      '\uffff' -> {
+      '\u0000' -> {
         pos++
         END
       }
-      in AZaz -> eatIdentifier()
+      in AZaz -> getIdentifier()
       in Space -> {
         pos++
         getToken()
@@ -147,27 +165,27 @@ class Parser(i : String) {
         parseRP()
         x1
       }
-      is Identifier -> x.toSymbol()
+      is Identifier -> Pure(x.toSymbol())
       else -> throw ParseException("unexpected token \"$x\"")
     }
   }
 
-  private fun parseFactor() : Expression {
+  private fun parseFactor() : MathExpression {
     val left = parseEnclosed()
     val x = getToken()
     return when (x) {
       Caret -> {
-        Power(left, parseFactor())
+        Power(toMath(left), parseFactor())
       }
       END, is Identifier, Plus, Minus, Times, Slash, LP, RP -> {
         ungetToken()
-        left
+        toMath(left)
       }
       else -> throw ParseException("unexpected token \"$x\"")
     }
   }
 
-  private tailrec fun parseTermEx(left : Expression) : Expression {
+  private tailrec fun parseTermEx(left : MathExpression) : MathExpression {
     val x = getToken()
     return when (x) {
       Plus, Minus -> {
@@ -191,14 +209,13 @@ class Parser(i : String) {
         left
       }
       is Identifier -> {
-        parseTermEx(Multiplication(left, x.toSymbol()))
+        parseTermEx(Multiplication(left, Pure(x.toSymbol())))
       }
       else -> throw ParseException("unexpected token \"$x\"")
     }
   }
 
-
-  private fun parseExprEx(left : Expression) : Expression {
+  private fun parseExprEx(left : MathExpression) : MathExpression {
     val x = getToken()
     return when (x) {
       Plus -> {
