@@ -80,52 +80,52 @@ class Parser(i : String) {
     lpos = pos
     return when (input[pos]) {
       in numbers -> readNum()
-      '+' -> {
+      '+'        -> {
         pos++
         Plus
       }
-      '-' -> {
+      '-'        -> {
         pos++
         Minus
       }
-      '*' -> {
+      '*'        -> {
         pos++
         Times
       }
-      '/' -> {
+      '/'        -> {
         pos++
         Slash
       }
-      '\\' -> {
+      '\\'       -> {
         pos++
         BackSlash
       }
-      '.' -> {
+      '.'        -> {
         pos++
         Dot
       }
-      '^' -> {
+      '^'        -> {
         pos++
         Caret
       }
-      '(' -> {
+      '('        -> {
         pos++
         LP
       }
-      ')' -> {
+      ')'        -> {
         pos++
         RP
       }
-      '\u0000' -> {
+      '\u0000'   -> {
         pos++
         END
       }
-      in AZaz -> getIdentifier()
-      in Space -> {
+      in AZaz    -> getIdentifier()
+      in Space   -> {
         pos++
         getToken()
       }
-      else -> throw ParseException("cannot read input char '${input[pos]}'")
+      else       -> throw ParseException("cannot read input char '${input[pos]}'")
     }
   }
 
@@ -135,6 +135,7 @@ class Parser(i : String) {
   }
 
   private fun ungetToken() {
+    if (pos == lpos) throw IllegalStateException("can't retract twice / position is 0")
     pos = lpos
   }
 
@@ -142,103 +143,111 @@ class Parser(i : String) {
     val x = getToken()
     ungetToken()
     return when (x) {
-      is Number, LP, is Identifier -> parseTermEx(parseFactor())
-      END -> Numeral(BigInteger.valueOf(0))
-      else -> throw ParseException("unexpected token \"$x\"")
+      is Number, is Identifier, LP -> parseExpr()
+      END                          -> Numeral(BigInteger.valueOf(0))
+      else                         -> throw ParseException("unexpected token \"$x\"")
     }
   }
 
   private fun parseRP() {
     val x = getToken()
     when (x) {
-      RP -> return
+      RP   -> return
       else -> throw ParseException("unexpected token \"$x\"")
     }
   }
 
-  private fun parseEnclosed() : Expression {
+  private fun parseAtom() : Expression {
     val x = getToken()
     return when (x) {
-      is Number -> x.toNumeral()
-      LP -> {
+      is Number     -> x.toNumeral()
+      LP            -> {
         val x1 = parse()
         parseRP()
         x1
       }
       is Identifier -> Pure(x.toSymbol())
-      else -> throw ParseException("unexpected token \"$x\"")
+      else          -> throw ParseException("unexpected token \"$x\"")
     }
   }
 
   private fun parseFactor() : MathExpression {
-    val left = parseEnclosed()
+    val left = parseAtom()
+    return parseFactorEx(left.toMath())
+  }
+
+  private fun parseFactorEx(left : MathExpression) : MathExpression {
     val x = getToken()
     return when (x) {
-      Caret -> {
-        Power(toMath(left), parseFactor())
+      Caret                                                 -> {
+        Power(left, parseFactor())
       }
       END, is Identifier, Plus, Minus, Times, Slash, LP, RP -> {
         ungetToken()
-        toMath(left)
+        left
       }
-      else -> throw ParseException("unexpected token \"$x\"")
+      else                                                  ->
+        throw ParseException("unexpected token \"$x\"")
     }
   }
 
   private tailrec fun parseTermEx(left : MathExpression) : MathExpression {
     val x = getToken()
     return when (x) {
-      Plus, Minus -> {
-        ungetToken()
-        parseExprEx(left)
-      }
-      Times, LP -> {
-        val n = parseFactor()
-        parseTermEx(Multiplication(left, n))
-      }
-      Slash -> {
-        val n = parseFactor()
-        parseTermEx(Multiplication(left, Power(n, Numeral.MINUS_ONE)))
-      }
-      RP -> {
+      Plus, Minus       -> {
         ungetToken()
         left
       }
-      END -> {
+      Times             -> {
+        val n = parseFactor()
+        parseTermEx(left * n)
+      }
+      Slash             -> {
+        val n = parseFactor()
+        parseTermEx(left * Power(n, Numeral.MINUS_ONE))
+      }
+      RP                -> {
         ungetToken()
         left
       }
-      is Identifier -> {
-        parseTermEx(Multiplication(left, Pure(x.toSymbol())))
+      END               -> {
+        ungetToken()
+        left
       }
-      else -> throw ParseException("unexpected token \"$x\"")
+      is Identifier, LP -> {
+        ungetToken()
+        val n = parseFactor()
+        parseTermEx(left * n)
+      }
+      else              -> throw ParseException("unexpected token \"$x\"")
     }
   }
 
-  private fun parseExprEx(left : MathExpression) : MathExpression {
+  private tailrec fun parseExprEx(left : MathExpression) : MathExpression {
     val x = getToken()
     return when (x) {
-      Plus -> {
-        val n = parseFactor()
-        parseTermEx(Addition(left, n))
+      Plus  -> {
+        val n = parseTerm()
+        parseExprEx(left + n)
       }
       Minus -> {
-        val n = parseFactor()
-        parseTermEx(
-            Addition(left, Multiplication(n, Numeral.MINUS_ONE))
-        )
+        val n = parseTerm()
+        parseExprEx(left + n * Numeral.MINUS_ONE)
       }
-      RP -> {
+      RP    -> {
         ungetToken()
         left
       }
-      END -> {
+      END   -> {
         ungetToken()
         left
       }
-      else -> throw ParseException("unexpected token \"$x\"")
+      else  -> throw ParseException("unexpected token \"$x\"")
     }
   }
+
+  private fun parseTerm() = parseTermEx(parseFactor())
+  private fun parseExpr() = parseExprEx(parseTerm())
 }
 
 fun parse(i : String) : Expression {

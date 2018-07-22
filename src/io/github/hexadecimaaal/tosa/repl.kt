@@ -16,9 +16,8 @@ class REPL(
     writer.printf(hint)
     reader.forEachLine {
       try {
-        writer.println("${simpl(parse(it))}\n")
-      }
-      catch (e : ParseException) {
+        writer.println("${simpl(parse(it), builtin)}\n")
+      } catch (e : ParseException) {
         writer.println(e.message)
       }
       writer.printf(hint)
