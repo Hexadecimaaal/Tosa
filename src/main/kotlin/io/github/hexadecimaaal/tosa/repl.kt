@@ -17,6 +17,7 @@ class REPL(
     reader.forEachLine {
       try {
         writer.println("${simpl(parse(it), builtin)}\n")
+        TosaParser(TosaLexer(it))
       } catch (e : ParseException) {
         writer.println(e.message)
       }
@@ -30,7 +31,7 @@ class REPL(
   }
 }
 
-fun main(args : Array<String>) {
+fun main() {
   val r = REPL(System.`in`, System.out, ">>>")
   r.run()
   r.close()

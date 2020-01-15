@@ -55,7 +55,7 @@ data class Identifier(private val name : String) : Token() {
   fun toSymbol() = Symbol(name)
 }
 
-class Parser(i : String) {
+class OldParser(i : String) {
   private var pos : Int = 0
   private var lpos : Int = pos
   private var input : String = i + "\u0000"
@@ -135,7 +135,7 @@ class Parser(i : String) {
   }
 
   private fun ungetToken() {
-    if (pos == lpos) throw IllegalStateException("can't retract twice / position is 0")
+    check(pos != lpos) { "can't retract twice / position is 0" }
     pos = lpos
   }
 
@@ -150,16 +150,14 @@ class Parser(i : String) {
   }
 
   private fun parseRP() {
-    val x = getToken()
-    when (x) {
+    when (val x = getToken()) {
       RP   -> return
       else -> throw ParseException("unexpected token \"$x\"")
     }
   }
 
   private fun parseAtom() : Expression {
-    val x = getToken()
-    return when (x) {
+    return when (val x = getToken()) {
       is Number     -> x.toNumeral()
       LP            -> {
         val x1 = parse()
@@ -171,14 +169,8 @@ class Parser(i : String) {
     }
   }
 
-  private fun parseFactor() : MathExpression {
-    val left = parseAtom()
-    return parseFactorEx(left.toMath())
-  }
-
   private fun parseFactorEx(left : MathExpression) : MathExpression {
-    val x = getToken()
-    return when (x) {
+    return when (val x = getToken()) {
       Caret                                                 -> {
         Power(left, parseFactor())
       }
@@ -192,8 +184,7 @@ class Parser(i : String) {
   }
 
   private tailrec fun parseTermEx(left : MathExpression) : MathExpression {
-    val x = getToken()
-    return when (x) {
+    return when (val x = getToken()) {
       Plus, Minus       -> {
         ungetToken()
         left
@@ -224,8 +215,7 @@ class Parser(i : String) {
   }
 
   private tailrec fun parseExprEx(left : MathExpression) : MathExpression {
-    val x = getToken()
-    return when (x) {
+    return when (val x = getToken()) {
       Plus  -> {
         val n = parseTerm()
         parseExprEx(left + n)
@@ -246,13 +236,19 @@ class Parser(i : String) {
     }
   }
 
+  private fun parseFactor() = parseFactorEx(parseAtom().toMath())
   private fun parseTerm() = parseTermEx(parseFactor())
   private fun parseExpr() = parseExprEx(parseTerm())
 }
 
 fun parse(i : String) : Expression {
-  val p = Parser(i)
+  val p = OldParser(i)
   return p.parse()
 }
 
 class ParseException(override val message : String = "") : Exception(message)
+
+
+class Parser {
+
+}
