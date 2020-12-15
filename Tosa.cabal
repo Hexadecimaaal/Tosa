@@ -18,5 +18,6 @@ extra-source-files:  CHANGELOG.md
 
 library
   hs-source-dirs:    src
-  exposed-modules:   Language.Tosa
-  build-depends:     base, containers
+  exposed-modules:   Language.Tosa, Language.Tosa.Parser
+  extensions:        TypeSynonymInstances, FlexibleInstances, TupleSections, OverloadedStrings
+  build-depends:     base, containers, megaparsec, text
