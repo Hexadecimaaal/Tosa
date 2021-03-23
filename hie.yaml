@@ -1,0 +1,7 @@
+cradle:
+  cabal:
+    - path: "src"
+      component: "lib:Tosa"
+
+    - path: "./app/REPL.hs"
+      component: "Tosa:exe:Tosa"

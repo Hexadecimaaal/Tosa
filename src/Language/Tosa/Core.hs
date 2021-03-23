@@ -46,6 +46,7 @@ data Error
     | NotApplicatable Expression
     | NotAName Expression
     | StackEmptied
+    | Undefined Expression
     deriving (Show, Eq)
 
 -- under given Bindings and Stack, evaluate Expression, i.e.
@@ -72,7 +73,7 @@ eval (b, MkStack (e : rest)) (Name "QUOTE") = Right (b, MkStack $ Quote e : rest
 -- substitute if it's defined.
 eval (b, s) (Name n) = if member n b 
     then eval (b, s) $ b ! n 
-    else eval (b, s) $ Quote $ Name n
+    else Left $ Undefined $ Name n
 
 -- evaluating a Quote will push the Quoted contents
 -- onto the stack, *without* evaluating them.
@@ -91,16 +92,16 @@ evalProgram (b, s) (h:t) = do
     evalProgram c t
 
 -- >>> :{
--- >>> do c <- eval emptyContext $ Quote $ Program [(Name "QUOTE"), (Name "$1"), (Name "STO"), (Name "$1"), (Name "$1")]
--- >>>    c <- eval c $ Name "DUP"
+-- >>> do c <- eval emptyContext $ Quote $ Program [(Name "QUOTE"), (Quote $ Name "$1"), (Name "STO"), (Name "$1"), (Name "$1")]
+-- >>>    c <- eval c $ Quote $ Name "DUP"
 -- >>>    c <- eval c $ Name "STO"
--- >>>    c <- eval c $ Name "x"
+-- >>>    c <- eval c $ Quote $ Name "x"
 -- >>>    c <- eval c $ Name "DUP"
--- >>>    c <- eval c $ Name "y"
+-- >>>    c <- eval c $ Quote $ Name "y"
 -- >>>    c <- eval c $ Name "DUP"
 -- >>>    return c
 -- >>> :}
--- Right DUP := {QUOTE $1 STO $1 $1}
+-- Right DUP := {QUOTE ($1) STO $1 $1}
 -- -----
 -- Stack Size: 4
 -- 4: x

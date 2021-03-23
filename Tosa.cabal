@@ -31,4 +31,4 @@ library
 executable Tosa
   import:            settings
   build-depends:     base, haskeline, text, Tosa
-  main-is:           src/REPL.hs
+  main-is:           app/REPL.hs
