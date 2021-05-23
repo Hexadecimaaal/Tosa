@@ -71,7 +71,7 @@ eval (b, MkStack (e : rest)) (Name "QUOTE") = Right (b, MkStack $ Quote e : rest
 
 -- evaluating a generic name will match it in Bindings and
 -- substitute if it's defined.
-eval (b, s) (Name n) = if member n b 
+eval (b, s) (Name n) = if member n b
     then eval (b, s) $ b ! n 
     else Left $ Undefined $ Name n
 

@@ -20,13 +20,13 @@ common settings
   default-language:  Haskell2010
   default-extensions:TypeSynonymInstances, FlexibleInstances, TupleSections, OverloadedStrings
   ghc-options:       -Wno-name-shadowing
+  build-depends:     base, containers, megaparsec, text, haskeline
 
 library
   import:            settings
   hs-source-dirs:    src
   exposed-modules:   Language.Tosa
   other-modules:     Language.Tosa.Core Language.Tosa.Parser
-  build-depends:     base, containers, megaparsec, text
 
 executable Tosa
   import:            settings
