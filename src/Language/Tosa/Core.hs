@@ -49,7 +49,7 @@ data Error
     | Undefined Expression
     deriving (Show, Eq)
 
--- under given Bindings and Stack, evaluate Expression, i.e.
+-- under given 'Bindings' and 'Stack', evaluate 'Expression', i.e.
 -- if it's a function then apply it, else push it into the stack
 eval :: Context -> Expression -> Either Error Context
 
@@ -75,7 +75,7 @@ eval (b, s) (Name n) = if member n b
     then eval (b, s) $ b ! n 
     else Left $ Undefined $ Name n
 
--- evaluating a Quote will push the Quoted contents
+-- evaluating a 'Quote' will push the 'Quote'd contents
 -- onto the stack, *without* evaluating them.
 -- evaluate "EVAL" to force.
 eval (b, s) (Quote o) = Right (b, MkStack (o : getStack s))
@@ -83,7 +83,7 @@ eval (b, s) (Quote o) = Right (b, MkStack (o : getStack s))
 
 eval (b, s) (Program p) = fmap (\(_, s') -> (b, s')) $ evalProgram (b, s) p
 
--- evaluating a series of Expressions: evaluate the first step,
+-- evaluating a series of 'Expressions': evaluate the first step,
 -- use the new environment to evaluate the rest.
 evalProgram :: Context -> [Expression] -> Either Error Context
 evalProgram (b, s) []    = Right (b, s)
